@@ -2,8 +2,11 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import io from 'socket.io-client';
 import { useAuth } from '../app/_layout';
 
-const API_BASE_URL = 'http://192.168.1.4:5000';
-const socket = io(API_BASE_URL);
+const API_BASE_URL = 'https://sportsapp-2c1m.onrender.com';
+const socket = io(API_BASE_URL, {
+  transports: ['websocket', 'polling'],
+  autoConnect: true,
+});
 
 export interface Match {
   id: string;
@@ -20,8 +23,8 @@ export interface Match {
   isLive?: boolean;
   recentBalls?: string[];
   ballHistory?: string[];
-  inningsABalls?: string[]; // ⚡ 1st Innings delivery history
-  inningsBBalls?: string[]; // ⚡ 2nd Innings delivery history
+  inningsABalls?: string[];
+  inningsBBalls?: string[];
 }
 
 export interface SportEvent {
@@ -81,8 +84,28 @@ export function SportsProvider({ children }: { children: React.ReactNode }) {
 
   const fetchEvents = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/events`);
-      const result = await response.json();
+      const response = await fetch(`${API_BASE_URL}/api/events`, {
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+
+      const rawText = await response.text();
+
+      // Guard against empty responses or HTML error pages (e.g., Render 502/504)
+      if (!rawText || rawText.trim() === '' || rawText.trim().startsWith('<')) {
+        console.warn('Backend returned non-JSON / server warming up on Render.');
+        return;
+      }
+
+      let result;
+      try {
+        result = JSON.parse(rawText);
+      } catch {
+        console.warn('Unable to parse server output as JSON:', rawText);
+        return;
+      }
+
       if (result.success && Array.isArray(result.data)) {
         const mappedData: SportEvent[] = result.data.map((item: any) => ({
           id: item._id,
@@ -100,7 +123,7 @@ export function SportsProvider({ children }: { children: React.ReactNode }) {
             isLive: m.isLive,
             recentBalls: m.ballHistory || m.recentBalls || [],
             ballHistory: m.ballHistory || m.recentBalls || [],
-            inningsABalls: m.inningsABalls || [],
+            inningsABalls: m.inningsABalls || m.ballHistory || [],
             inningsBBalls: m.inningsBBalls || [],
             totalOvers: m.totalOvers || '20',
           })),
@@ -116,6 +139,7 @@ export function SportsProvider({ children }: { children: React.ReactNode }) {
     try {
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
+        Accept: 'application/json',
       };
       if (user?.token) {
         headers['Authorization'] = `Bearer ${user.token}`;
@@ -126,7 +150,11 @@ export function SportsProvider({ children }: { children: React.ReactNode }) {
         headers,
         body: JSON.stringify(eventData),
       });
-      const result = await response.json();
+
+      const rawText = await response.text();
+      if (!rawText || rawText.trim().startsWith('<')) return false;
+
+      const result = JSON.parse(rawText);
       if (result.success) {
         await fetchEvents();
         return true;
@@ -156,7 +184,10 @@ export function SportsProvider({ children }: { children: React.ReactNode }) {
     try {
       await fetch(`${API_BASE_URL}/api/matches/${eventId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
         body: JSON.stringify({
           teamAName: teamA,
           teamBName: teamB,
@@ -196,7 +227,10 @@ export function SportsProvider({ children }: { children: React.ReactNode }) {
     try {
       await fetch(`${API_BASE_URL}/api/matches`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
         body: JSON.stringify({
           eventId,
           teamAName: teamA,

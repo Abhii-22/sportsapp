@@ -5,10 +5,10 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 require('dotenv').config();
 
-const connectDB = require('./config/db'); //[cite: 6]
-const authRoutes = require('./routes/authRoutes'); //[cite: 14]
-const eventRoutes = require('./routes/eventRoutes'); //[cite: 15]
-const matchRoutes = require('./routes/matchRoutes'); //[cite: 16]
+const connectDB = require('./config/db');
+const authRoutes = require('./routes/authRoutes');
+const eventRoutes = require('./routes/eventRoutes');
+const matchRoutes = require('./routes/matchRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -17,16 +17,22 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE']
-  }
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  },
 });
 
 // Connect to MongoDB Atlas Cloud Database
-connectDB(); //[cite: 6]
+connectDB();
 
 // Standard Middlewares
-app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Higher payload limit for image/poster uploads
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Inject Socket.io into HTTP requests so controllers can emit live events
 app.use((req, res, next) => {
@@ -34,16 +40,34 @@ app.use((req, res, next) => {
   next();
 });
 
-// Mount Express API Endpoint Routes
-app.use('/api/auth', authRoutes); //[cite: 14]
-app.use('/api/events', eventRoutes); //[cite: 15]
-app.use('/api/matches', matchRoutes); //[cite: 16]
-
-// Health Check Endpoint
+// Health Check Endpoint (Render Health Check)
 app.get('/', (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'AK Sports Backend API and WebSocket Server are running.'
+    status: 'OK',
+    message: 'AK Sports Backend API and WebSocket Server are running.',
+  });
+});
+
+// Mount Express API Endpoint Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/matches', matchRoutes);
+
+// Global 404 Handler (Always returns JSON instead of default HTML)
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `API Route Not Found: ${req.method} ${req.originalUrl}`,
+  });
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('Server Unhandled Error:', err.stack);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal Server Error',
   });
 });
 
@@ -56,8 +80,13 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start Express Server
+// Catch unhandled database rejections
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Rejection Error:', err);
+});
+
+// Start Express Server - Binding explicitly to 0.0.0.0 for Render
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`AK Sports Server running on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 AK Sports Server running on port ${PORT}`);
 });
