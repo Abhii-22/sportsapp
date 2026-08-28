@@ -27,6 +27,7 @@ export default function HomeScreen() {
         id: match._id || match.id || `event-${event.id || eventIdx}-match-${matchIdx}`,
         eventId: event.id,
         sport: event.sportCategory ? event.sportCategory.toUpperCase() : event.name.toUpperCase(),
+        sportCategory: event.sportCategory || 'Others',
         sportType: event.sportType,
         teamA: match.teamAName || 'TEAM A',
         teamB: match.teamBName || 'TEAM B',
@@ -70,7 +71,7 @@ export default function HomeScreen() {
   });
 
   const handleOpenBreakdown = (matchItem: any) => {
-    if (matchItem.isFinished) {
+    if (matchItem.isFinished && matchItem.sportType === 'CRICKET') {
       setSelectedFinishedMatch(matchItem);
       setSelectedInningsTeam('A');
       setBreakdownModalVisible(true);
@@ -105,6 +106,17 @@ export default function HomeScreen() {
   const displayedBalls = selectedInningsTeam === 'A' 
     ? (selectedFinishedMatch?.inningsABalls || []) 
     : (selectedFinishedMatch?.inningsBBalls || []);
+
+  const getSportIcon = (category: string) => {
+    switch (category?.toLowerCase()) {
+      case 'cricket': return 'trophy-outline';
+      case 'kabaddi': return 'fitness-outline';
+      case 'volleyball': return 'baseball-outline';
+      case 'badminton':
+      case 'shuttle': return 'tennisball-outline';
+      default: return 'football-outline';
+    }
+  };
 
   return (
     <View style={styles.mainContainer}>
@@ -177,12 +189,13 @@ export default function HomeScreen() {
                   styles.matchCardVertical, 
                   item.isLive ? styles.liveCardBorder : styles.finishedCardSideBorder
                 ]}
-                activeOpacity={item.isFinished ? 0.88 : 1}
+                activeOpacity={item.isFinished && isCricket ? 0.88 : 1}
                 onPress={() => handleOpenBreakdown(item)}
               >
                 <View style={styles.cardHeaderRow}>
                   <View style={styles.titleWithBadgeRow}>
                     <View style={[styles.sportLabelTag, item.isFinished && styles.finishedSportLabelTagBg]}>
+                      <Ionicons name={getSportIcon(item.sportCategory)} size={12} color="#0F172A" style={{ marginRight: 4 }} />
                       <Text style={[styles.cardSportTypeText, item.isFinished && styles.finishedSportLabelTagText]}>{item.sport}</Text>
                     </View>
                     {item.isVerified && (
@@ -203,8 +216,10 @@ export default function HomeScreen() {
                     <Text style={styles.teamNameText} numberOfLines={1}>{item.teamA}</Text>
                     <View style={styles.scoreTextCluster}>
                       <Text style={styles.teamScoreValue}>{item.scoreA}</Text>
-                      {isCricket && (
+                      {isCricket ? (
                         <Text style={styles.cricketWicketsValue}>/{item.wicketsA}</Text>
+                      ) : (
+                        <Text style={styles.pointsLabelUnit}> pts</Text>
                       )}
                     </View>
                   </View>
@@ -213,13 +228,16 @@ export default function HomeScreen() {
                     <Text style={styles.teamNameText} numberOfLines={1}>{item.teamB}</Text>
                     <View style={styles.scoreTextCluster}>
                       <Text style={styles.teamScoreValue}>{item.scoreB}</Text>
-                      {isCricket && (
+                      {isCricket ? (
                         <Text style={styles.cricketWicketsValue}>/{item.wicketsB}</Text>
+                      ) : (
+                        <Text style={styles.pointsLabelUnit}> pts</Text>
                       )}
                     </View>
                   </View>
                 </View>
 
+                {/* Cricket Only Recent Deliveries Row (Untouched) */}
                 {isCricket && item.isLive && item.recentBalls && item.recentBalls.length > 0 && (
                   <View style={styles.cardBallsTickerRow}>
                     <Text style={styles.recentBallsTag}>RECENT:</Text>
@@ -263,7 +281,7 @@ export default function HomeScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* OVER-BY-OVER DELIVERIES BREAKDOWN MODAL */}
+      {/* CRICKET OVER-BY-OVER DELIVERIES BREAKDOWN MODAL (UNTOUCHED) */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -389,7 +407,7 @@ const styles = StyleSheet.create({
   
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   titleWithBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sportLabelTag: { backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  sportLabelTag: { backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center' },
   finishedSportLabelTagBg: { backgroundColor: '#F8FAFC' },
   cardSportTypeText: { color: '#0F172A', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
   finishedSportLabelTagText: { color: '#475569' },
@@ -410,6 +428,7 @@ const styles = StyleSheet.create({
   scoreTextCluster: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'flex-end', flex: 0.28 },
   teamScoreValue: { color: '#0F172A', fontSize: 18, fontWeight: '900' },
   cricketWicketsValue: { color: '#64748B', fontSize: 14, fontWeight: '700' },
+  pointsLabelUnit: { color: '#64748B', fontSize: 11, fontWeight: '800' },
   
   cardBallsTickerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, marginTop: 4 },
   recentBallsTag: { fontSize: 9, fontWeight: '900', color: '#64748B' },
