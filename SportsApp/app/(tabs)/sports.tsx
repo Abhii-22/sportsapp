@@ -28,9 +28,6 @@ const FILTER_CATEGORIES = [
   { label: 'Others', value: 'Others' },
 ];
 
-const DEFAULT_ORGANIZER_AVATAR =
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80';
-
 export default function SportsScreen() {
   const { events } = useSports();
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -49,11 +46,10 @@ export default function SportsScreen() {
     }
 
     const encodedLocation = encodeURIComponent(locationAddress);
-    const mapUrl =
-      Platform.select({
-        ios: `maps://app?daddr=${encodedLocation}`,
-        android: `google.navigation:q=${encodedLocation}`,
-      }) || `https://www.google.com/maps/dir/?api=1&destination=${encodedLocation}`;
+    const mapUrl = Platform.select({
+      ios: `maps://app?daddr=${encodedLocation}`,
+      android: `google.navigation:q=${encodedLocation}`,
+    }) || `https://www.google.com/maps/dir/?api=1&destination=${encodedLocation}`;
 
     Linking.canOpenURL(mapUrl)
       .then((supported) => {
@@ -89,9 +85,7 @@ export default function SportsScreen() {
     return isNaN(parsed) ? Infinity : parsed;
   };
 
-  const getCountdownLabel = (
-    dateString: string
-  ): { text: string; isToday: boolean; isTomorrow: boolean; isPast: boolean } => {
+  const getCountdownLabel = (dateString: string): { text: string; isToday: boolean; isTomorrow: boolean; isPast: boolean } => {
     const eventTime = getNormalizedTimestamp(dateString);
     if (eventTime === Infinity) return { text: 'SCHEDULED', isToday: false, isTomorrow: false, isPast: false };
 
@@ -115,17 +109,17 @@ export default function SportsScreen() {
     }
   };
 
-  const getOrganizerDetails = (event: any) => {
-    if (event?.organizer && typeof event.organizer === 'object') {
-      return {
-        name: event.organizer.fullName || 'Official Organizer',
-        avatar: DEFAULT_ORGANIZER_AVATAR,
-      };
+  const getOrganizerName = (eventItem: any): string => {
+    if (eventItem?.organizer && typeof eventItem.organizer === 'object' && eventItem.organizer.fullName) {
+      return eventItem.organizer.fullName;
     }
-    return {
-      name: 'Official Organizer',
-      avatar: DEFAULT_ORGANIZER_AVATAR,
-    };
+    if (eventItem?.organizerDetails?.fullName) {
+      return eventItem.organizerDetails.fullName;
+    }
+    if (typeof eventItem?.organizerName === 'string' && eventItem.organizerName.trim()) {
+      return eventItem.organizerName;
+    }
+    return 'Organizer';
   };
 
   const filteredEvents = events.filter((event) => {
@@ -167,7 +161,7 @@ export default function SportsScreen() {
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.todayCardsScroll}>
             {todayMatches.map((tEvent) => {
-              const host = getOrganizerDetails(tEvent);
+              const organizerName = getOrganizerName(tEvent);
               return (
                 <TouchableOpacity
                   key={`today-${tEvent.id}`}
@@ -175,14 +169,22 @@ export default function SportsScreen() {
                   activeOpacity={0.9}
                   onPress={() => handleOpenDetails(tEvent)}
                 >
-                  <View style={styles.todayCardTopRow}>
-                    <View style={styles.todayBadge}>
-                      <Text style={styles.todayBadgeText}>TODAY</Text>
-                    </View>
-                    <Image source={{ uri: host.avatar }} style={styles.todayOrganizerAvatar} />
+                  <View style={styles.todayBadge}>
+                    <Text style={styles.todayBadgeText}>TODAY</Text>
                   </View>
                   <Text style={styles.todayMatchName} numberOfLines={1}>{tEvent.name}</Text>
-                  <Text style={styles.todayHostNameText} numberOfLines={1}>By {host.name}</Text>
+                  
+                  <View style={styles.todayHostRow}>
+                    <View style={styles.todayAvatarMini}>
+                      <Text style={styles.todayAvatarMiniText}>
+                        {organizerName.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={styles.todayHostNameText} numberOfLines={1}>
+                      {organizerName}
+                    </Text>
+                  </View>
+
                   <View style={styles.todayLocationRow}>
                     <Ionicons name="location" size={12} color="#059669" />
                     <Text style={styles.todayLocationText} numberOfLines={1}>{tEvent.location}</Text>
@@ -232,7 +234,7 @@ export default function SportsScreen() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
             const countdown = getCountdownLabel(item.date);
-            const organizer = getOrganizerDetails(item);
+            const hostFullName = getOrganizerName(item);
 
             return (
               <TouchableOpacity
@@ -314,17 +316,24 @@ export default function SportsScreen() {
                   </View>
                 </View>
 
-                {/* 👤 Organizer Host Bar */}
-                <View style={styles.hostProfileStrip}>
-                  <Image source={{ uri: organizer.avatar }} style={styles.hostAvatarSmall} />
-                  <View style={styles.hostTextCluster}>
-                    <Text style={styles.hostedByCaption}>HOSTED BY</Text>
-                    <Text style={styles.hostNameText} numberOfLines={1}>
-                      {organizer.name}
+                {/* 👤 Organizer Strip */}
+                <View style={styles.hostStripContainer}>
+                  <View style={styles.hostAvatarCircle}>
+                    <Text style={styles.hostAvatarText}>
+                      {hostFullName.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.hostDetailsColumn}>
+                    <Text style={styles.hostLabelPrefix}>HOSTED BY</Text>
+                    <Text style={styles.hostFullNameText} numberOfLines={1}>
+                      {hostFullName}
                     </Text>
                   </View>
                   {item.isVerifiedOrganizer && (
-                    <Ionicons name="shield-checkmark" size={15} color="#059669" style={styles.hostVerifiedIcon} />
+                    <View style={styles.verifiedHostTag}>
+                      <Ionicons name="shield-checkmark" size={13} color="#059669" />
+                      <Text style={styles.verifiedHostTagText}>Verified Organizer</Text>
+                    </View>
                   )}
                 </View>
 
@@ -379,20 +388,21 @@ export default function SportsScreen() {
                 </View>
               )}
 
-              {/* Organizer Detail Card in Modal */}
+              {/* Modal Organizer Card */}
               {selectedEvent && (
                 <View style={styles.modalHostCard}>
-                  <Image
-                    source={{ uri: getOrganizerDetails(selectedEvent).avatar }}
-                    style={styles.modalHostAvatar}
-                  />
-                  <View style={styles.modalHostInfo}>
-                    <Text style={styles.modalHostCaption}>OFFICIAL HOST / ORGANIZER</Text>
-                    <Text style={styles.modalHostTitle}>{getOrganizerDetails(selectedEvent).name}</Text>
+                  <View style={styles.modalHostAvatar}>
+                    <Text style={styles.modalHostAvatarText}>
+                      {getOrganizerName(selectedEvent).charAt(0).toUpperCase()}
+                    </Text>
                   </View>
-                  <View style={styles.verifiedPill}>
-                    <Ionicons name="shield-checkmark" size={12} color="#059669" />
-                    <Text style={styles.verifiedPillText}>Verified</Text>
+                  <View style={styles.modalHostInfo}>
+                    <Text style={styles.modalHostCaption}>OFFICIAL HOST</Text>
+                    <Text style={styles.modalHostTitle}>{getOrganizerName(selectedEvent)}</Text>
+                  </View>
+                  <View style={styles.modalHostBadge}>
+                    <Ionicons name="shield-checkmark" size={14} color="#059669" />
+                    <Text style={styles.modalHostBadgeText}>Verified</Text>
                   </View>
                 </View>
               )}
@@ -471,12 +481,13 @@ const styles = StyleSheet.create({
   todaySectionTitle: { fontSize: 11, fontWeight: '900', color: '#059669', letterSpacing: 0.5 },
   todayCardsScroll: { gap: 10 },
   todayFeaturedCard: { backgroundColor: '#FFFFFF', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#86EFAC', minWidth: 170, maxWidth: 210 },
-  todayCardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  todayBadge: { backgroundColor: '#059669', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
+  todayBadge: { backgroundColor: '#059669', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start', marginBottom: 6 },
   todayBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
-  todayOrganizerAvatar: { width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: '#86EFAC' },
-  todayMatchName: { fontSize: 13, fontWeight: '800', color: '#0F172A', marginBottom: 2 },
-  todayHostNameText: { fontSize: 10, fontWeight: '700', color: '#059669', marginBottom: 6 },
+  todayMatchName: { fontSize: 13, fontWeight: '800', color: '#0F172A', marginBottom: 4 },
+  todayHostRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 },
+  todayAvatarMini: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' },
+  todayAvatarMiniText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
+  todayHostNameText: { fontSize: 11, fontWeight: '700', color: '#0F172A', flexShrink: 1 },
   todayLocationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   todayLocationText: { fontSize: 11, fontWeight: '600', color: '#64748B' },
 
@@ -531,8 +542,7 @@ const styles = StyleSheet.create({
   thumbnailWrapper: { width: 78, height: 96, borderRadius: 10, overflow: 'hidden', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
   miniThumbnail: { width: '100%', height: '100%', resizeMode: 'cover' },
 
-  /* 👤 Host Organizer Strip Styles */
-  hostProfileStrip: {
+  hostStripContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
@@ -540,14 +550,53 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     borderRadius: 10,
     paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingVertical: 8,
     marginBottom: 12,
   },
-  hostAvatarSmall: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: '#CBD5E1', marginRight: 8 },
-  hostTextCluster: { flex: 1 },
-  hostedByCaption: { fontSize: 8, fontWeight: '800', color: '#94A3B8', letterSpacing: 0.5 },
-  hostNameText: { fontSize: 12, fontWeight: '800', color: '#0F172A' },
-  hostVerifiedIcon: { marginLeft: 6 },
+  hostAvatarCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  hostAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  hostDetailsColumn: {
+    flex: 1,
+  },
+  hostLabelPrefix: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  hostFullNameText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  verifiedHostTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  verifiedHostTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#059669',
+  },
 
   cardDividerLine: { height: 1, backgroundColor: '#F1F5F9', marginBottom: 10 },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -573,7 +622,6 @@ const styles = StyleSheet.create({
   previewContainer: { width: '100%', height: height * 0.44, borderRadius: 14, overflow: 'hidden', marginBottom: 16, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
   premiumPreviewImage: { width: '100%', height: '100%', resizeMode: 'contain' },
 
-  /* Modal Host Card */
   modalHostCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -584,12 +632,35 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 14,
   },
-  modalHostAvatar: { width: 38, height: 38, borderRadius: 19, borderWidth: 1.5, borderColor: '#0F172A', marginRight: 10 },
+  modalHostAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  modalHostAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+  },
   modalHostInfo: { flex: 1 },
   modalHostCaption: { fontSize: 9, fontWeight: '800', color: '#64748B', letterSpacing: 0.5 },
-  modalHostTitle: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
-  verifiedPill: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#A7F3D0' },
-  verifiedPillText: { fontSize: 10, fontWeight: '800', color: '#059669' },
+  modalHostTitle: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
+  modalHostBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  modalHostBadgeText: { fontSize: 11, fontWeight: '800', color: '#059669' },
 
   deckLabelTitle: { fontSize: 11, fontWeight: '800', color: '#64748B', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 10 },
   infoSummaryGrid: { gap: 10, marginBottom: 16 },

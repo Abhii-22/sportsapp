@@ -1,7 +1,7 @@
 const Event = require('../models/Event');
 const Match = require('../models/Match');
 
-// Fetch Public Tournaments with Organizer Info
+// Fetch Public Tournaments with Populated Organizer Details
 const getEvents = async (req, res) => {
   try {
     const { category } = req.query;
@@ -50,7 +50,7 @@ const getMyEvents = async (req, res) => {
   }
 };
 
-// Create Event
+// Create Event with populated organizer details
 const createEvent = async (req, res) => {
   try {
     const { name, sportCategory, sportType, date, location, poster } = req.body;
@@ -70,9 +70,11 @@ const createEvent = async (req, res) => {
       isVerifiedOrganizer: true,
     });
 
-    event = await event.populate('organizer', 'fullName email phone');
+    const populatedEvent = await Event.findById(event._id)
+      .populate('organizer', 'fullName email phone')
+      .lean();
 
-    res.status(201).json({ success: true, data: { ...event.toObject(), matches: [] } });
+    res.status(201).json({ success: true, data: { ...populatedEvent, matches: [] } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
