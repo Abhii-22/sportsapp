@@ -40,6 +40,7 @@ export default function ProfileScreen() {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  // Umpire Board States
   const [liveTeamA, setLiveTeamA] = useState('');
   const [liveTeamB, setLiveTeamB] = useState('');
   const [liveScoreA, setLiveScoreA] = useState('0');
@@ -175,6 +176,7 @@ export default function ProfileScreen() {
     setScoreModalVisible(true);
   };
 
+  // --- CRICKET SCORING LOGIC (UNTOUCHED) ---
   const calculateNextOver = (currentOversStr: string, isLegalBall: boolean): string => {
     let [completedOvers, balls] = currentOversStr.split('.').map((num) => parseInt(num, 10) || 0);
     if (isLegalBall) {
@@ -419,6 +421,43 @@ export default function ProfileScreen() {
     }
   };
 
+  // --- SPORT-SPECIFIC QUICK SCORING DISPATCHER ---
+  const handleSportSpecificPoint = (points: number, actionLabel: string) => {
+    let currentScore = parseInt(activeBattingTeam === 'A' ? liveScoreA : liveScoreB, 10) || 0;
+    currentScore = Math.max(0, currentScore + points);
+
+    const newScoreA = activeBattingTeam === 'A' ? currentScore.toString() : liveScoreA;
+    const newScoreB = activeBattingTeam === 'B' ? currentScore.toString() : liveScoreB;
+
+    if (activeBattingTeam === 'A') {
+      setLiveScoreA(newScoreA);
+    } else {
+      setLiveScoreB(newScoreB);
+    }
+
+    const activeTeamName = activeBattingTeam === 'A' ? (liveTeamA || 'TEAM A') : (liveTeamB || 'TEAM B');
+    const autoStatus = `${activeTeamName}: ${actionLabel} • Live (${newScoreA} - ${newScoreB})`;
+    setLiveStatusText(autoStatus);
+
+    if (selectedEvent) {
+      updateCurrentLiveMatch(
+        selectedEvent.id,
+        liveTeamA.trim() || 'TEAM A',
+        liveTeamB.trim() || 'TEAM B',
+        newScoreA,
+        newScoreB,
+        autoStatus,
+        '0',
+        '0',
+        '0.0',
+        [],
+        '20',
+        [],
+        []
+      );
+    }
+  };
+
   const handleManualLiveBroadcast = () => {
     if (!selectedEvent) return;
     if (!liveTeamA.trim() || !liveTeamB.trim()) {
@@ -433,7 +472,7 @@ export default function ProfileScreen() {
           parseInt(liveScoreB, 10) || 0,
           liveOvers, maxMatchOvers, activeBattingTeam
         )
-      : liveStatusText || 'Live Match Stream';
+      : liveStatusText || `Live Match (${liveScoreA} - ${liveScoreB})`;
 
     setLiveStatusText(initialStatus);
     updateCurrentLiveMatch(
@@ -617,6 +656,7 @@ export default function ProfileScreen() {
     : (selectedFinishedMatch?.inningsBBalls || []);
 
   const displayName = user?.fullName || 'Abhishek';
+  const currentSportCategory = selectedEvent?.sportCategory || 'Others';
 
   return (
     <View style={styles.container}>
@@ -681,6 +721,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* TAB 1: TOURNAMENT GRID VIEW */}
         {selectedProfileTab === 'tournaments' ? (
           <View style={styles.gridContainer}>
             {myEvents.length === 0 ? (
@@ -708,6 +749,7 @@ export default function ProfileScreen() {
             )}
           </View>
         ) : (
+          /* TAB 2: COMPLETED MATCHES VIEW */
           <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
             {uniqueFinishedMatches.length === 0 ? (
               <View style={styles.emptyContainer}>
@@ -956,7 +998,7 @@ export default function ProfileScreen() {
             <View style={styles.dragIndicator} />
             <View style={styles.modalHeaderRow}>
               <View>
-                <Text style={styles.modalSheetTitle}>Match Umpire Desk</Text>
+                <Text style={styles.modalSheetTitle}>{currentSportCategory.toUpperCase()} UMPIRE DESK</Text>
                 <Text style={styles.modalSheetSubtitle}>{selectedEvent?.name}</Text>
               </View>
               <TouchableOpacity onPress={() => setScoreModalVisible(false)} style={styles.closeSheetIcon}><Ionicons name="close" size={22} color="#000000" /></TouchableOpacity>
@@ -972,6 +1014,7 @@ export default function ProfileScreen() {
                 </View>
               ) : null}
 
+              {/* CRICKET SPECIFIC OVERS FIELD (UNTOUCHED) */}
               {selectedEvent?.sportType === 'CRICKET' && (
                 <View style={{ marginBottom: 16 }}>
                   <Text style={styles.inputLabel}>Match Overs Limit</Text>
@@ -989,6 +1032,7 @@ export default function ProfileScreen() {
                 </View>
               )}
 
+              {/* DUAL TEAM SCORE CARDS */}
               <View style={styles.scoreRowContainer}>
                 <TouchableOpacity 
                   activeOpacity={0.9}
@@ -1006,7 +1050,11 @@ export default function ProfileScreen() {
                     )}
                   </View>
                   {activeBattingTeam === 'A' && (
-                    <View style={styles.battingDotIndicatorBadge}><Text style={styles.battingDotIndicatorBadgeText}>1ST INNINGS (ON STRIKE)</Text></View>
+                    <View style={styles.battingDotIndicatorBadge}>
+                      <Text style={styles.battingDotIndicatorBadgeText}>
+                        {selectedEvent?.sportType === 'CRICKET' ? '1ST INNINGS (ON STRIKE)' : 'ACTIVE SCORING TEAM'}
+                      </Text>
+                    </View>
                   )}
                 </TouchableOpacity>
 
@@ -1026,11 +1074,16 @@ export default function ProfileScreen() {
                     )}
                   </View>
                   {activeBattingTeam === 'B' && (
-                    <View style={styles.battingDotIndicatorBadge}><Text style={styles.battingDotIndicatorBadgeText}>2ND INNINGS (CHASING)</Text></View>
+                    <View style={styles.battingDotIndicatorBadge}>
+                      <Text style={styles.battingDotIndicatorBadgeText}>
+                        {selectedEvent?.sportType === 'CRICKET' ? '2ND INNINGS (CHASING)' : 'ACTIVE SCORING TEAM'}
+                      </Text>
+                    </View>
                   )}
                 </TouchableOpacity>
               </View>
 
+              {/* ----------------- 1. CRICKET DESK (UNTOUCHED) ----------------- */}
               {selectedEvent?.sportType === 'CRICKET' ? (
                 <View style={styles.cricbuzzDashboardWrapper}>
                   <Text style={styles.sectionHeaderInnerLabelTitle}>Cricbuzz Rapid Score Input</Text>
@@ -1057,6 +1110,7 @@ export default function ProfileScreen() {
                     </View>
                   )}
                   
+                  {/* Runs Row 1 */}
                   <View style={styles.cricbuzzButtonMatrixRowGrid}>
                     <TouchableOpacity style={styles.cricbuzzBtn} onPress={() => handleBallDeliveryAction('SINGLE')}>
                       <Text style={styles.cricbuzzBtnVal}>+1</Text>
@@ -1084,6 +1138,7 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                   </View>
 
+                  {/* Extras Row */}
                   <View style={styles.cricbuzzButtonMatrixRowGrid}>
                     <TouchableOpacity style={[styles.cricbuzzWideActionBtn, { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' }]} onPress={() => handleBallDeliveryAction('WIDE')}>
                       <Ionicons name="swap-horizontal" size={15} color="#15803D" />
@@ -1096,6 +1151,7 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                   </View>
 
+                  {/* Actions Row */}
                   <View style={styles.cricbuzzButtonMatrixRowGrid}>
                     <TouchableOpacity style={[styles.cricbuzzWideActionBtn, { backgroundColor: '#FFFFFF', borderColor: '#000000' }]} onPress={() => handleBallDeliveryAction('INNING_BREAK')}>
                       <Ionicons name="cafe-outline" size={15} color="#000000" />
@@ -1113,21 +1169,176 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
-              ) : (
-                <View style={styles.genericPointsCardContainer}>
-                  <Text style={styles.inputLabel}>Standard Score Modifiers</Text>
-                  <View style={styles.genericPointsButtonInlineFlexRow}>
-                    <TouchableOpacity style={styles.standardIncrementBtnAction} onPress={() => {
-                      if (activeBattingTeam === 'A') setLiveScoreA((parseInt(liveScoreA, 10) + 1).toString());
-                      else setLiveScoreB((parseInt(liveScoreB, 10) + 1).toString());
-                    }}>
-                      <Text style={styles.standardIncrementBtnActionText}>+1 Point</Text>
+              ) : currentSportCategory === 'Kabaddi' ? (
+                /* ----------------- 2. KABADDI UMPIRE DESK ----------------- */
+                <View style={styles.sportDeskWrapper}>
+                  <Text style={styles.sectionHeaderInnerLabelTitle}>PRO KABADDI RAID & TACKLE CONSOLE</Text>
+                  <Text style={styles.strikeInstructionHelperSubtext}>
+                    Scoring For: <Text style={{ fontWeight: '900' }}>{activeBattingTeam === 'A' ? (liveTeamA || 'TEAM A') : (liveTeamB || 'TEAM B')}</Text>
+                  </Text>
+
+                  {/* Raid Points */}
+                  <Text style={styles.deskSubCategoryLabel}>⚡ RAID SCORING</Text>
+                  <View style={styles.sportGridRow}>
+                    <TouchableOpacity style={styles.sportScoreBtn} onPress={() => handleSportSpecificPoint(1, 'Touch Point (+1)')}>
+                      <Text style={styles.sportScoreBtnVal}>+1</Text>
+                      <Text style={styles.sportScoreBtnLbl}>Touch Point</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.standardIncrementBtnAction, { backgroundColor: '#F1F5F9' }]} onPress={() => {
-                      if (activeBattingTeam === 'A') setLiveScoreA(Math.max(0, parseInt(liveScoreA, 10) - 1).toString());
-                      else setLiveScoreB(Math.max(0, parseInt(liveScoreB, 10) - 1).toString());
+
+                    <TouchableOpacity style={[styles.sportScoreBtn, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]} onPress={() => handleSportSpecificPoint(1, 'Bonus Point (+1)')}>
+                      <Text style={[styles.sportScoreBtnVal, { color: '#059669' }]}>+1</Text>
+                      <Text style={[styles.sportScoreBtnLbl, { color: '#059669' }]}>Bonus Point</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.sportScoreBtn, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]} onPress={() => handleSportSpecificPoint(3, 'Super Raid (+3)')}>
+                      <Text style={[styles.sportScoreBtnVal, { color: '#2563EB' }]}>+3</Text>
+                      <Text style={[styles.sportScoreBtnLbl, { color: '#2563EB' }]}>Super Raid</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Tackle & All-Out */}
+                  <Text style={styles.deskSubCategoryLabel}>🛡️ DEFENSE & ALL-OUT</Text>
+                  <View style={styles.sportGridRow}>
+                    <TouchableOpacity style={styles.sportScoreBtn} onPress={() => handleSportSpecificPoint(1, 'Tackle Point (+1)')}>
+                      <Text style={styles.sportScoreBtnVal}>+1</Text>
+                      <Text style={styles.sportScoreBtnLbl}>Tackle Point</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.sportScoreBtn, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]} onPress={() => handleSportSpecificPoint(2, 'Super Tackle (+2)')}>
+                      <Text style={[styles.sportScoreBtnVal, { color: '#D97706' }]}>+2</Text>
+                      <Text style={[styles.sportScoreBtnLbl, { color: '#D97706' }]}>Super Tackle</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.sportScoreBtn, { backgroundColor: '#0F172A', borderColor: '#0F172A' }]} onPress={() => handleSportSpecificPoint(2, 'All Out (+2)')}>
+                      <Text style={[styles.sportScoreBtnVal, { color: '#FFFFFF' }]}>+2</Text>
+                      <Text style={[styles.sportScoreBtnLbl, { color: '#FFFFFF' }]}>All-Out</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Actions & Adjustments */}
+                  <View style={styles.sportActionRow}>
+                    <TouchableOpacity style={styles.secondaryDeskBtn} onPress={() => handleSportSpecificPoint(1, 'Technical Point (+1)')}>
+                      <Ionicons name="flag-outline" size={15} color="#0F172A" />
+                      <Text style={styles.secondaryDeskBtnText}>Technical (+1)</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.secondaryDeskBtn} onPress={() => handleSportSpecificPoint(-1, 'Point Correction (-1)')}>
+                      <Ionicons name="arrow-undo-outline" size={15} color="#E11D48" />
+                      <Text style={[styles.secondaryDeskBtnText, { color: '#E11D48' }]}>-1 Correction</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : currentSportCategory === 'Volleyball' ? (
+                /* ----------------- 3. VOLLEYBALL UMPIRE DESK ----------------- */
+                <View style={styles.sportDeskWrapper}>
+                  <Text style={styles.sectionHeaderInnerLabelTitle}>VOLLEYBALL RALLY POINT DESK</Text>
+                  <Text style={styles.strikeInstructionHelperSubtext}>
+                    Scoring For: <Text style={{ fontWeight: '900' }}>{activeBattingTeam === 'A' ? (liveTeamA || 'TEAM A') : (liveTeamB || 'TEAM B')}</Text>
+                  </Text>
+
+                  <View style={styles.sportGridRow}>
+                    <TouchableOpacity style={[styles.sportScoreBtn, { backgroundColor: '#0F172A', borderColor: '#0F172A' }]} onPress={() => handleSportSpecificPoint(1, 'Rally Point Won (+1)')}>
+                      <Text style={[styles.sportScoreBtnVal, { color: '#FFFFFF' }]}>+1</Text>
+                      <Text style={[styles.sportScoreBtnLbl, { color: '#FFFFFF' }]}>Rally Point</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.sportScoreBtn, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]} onPress={() => handleSportSpecificPoint(1, 'Ace Serve (+1)')}>
+                      <Text style={[styles.sportScoreBtnVal, { color: '#059669' }]}>ACE</Text>
+                      <Text style={[styles.sportScoreBtnLbl, { color: '#059669' }]}>Ace Serve (+1)</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.sportScoreBtn, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]} onPress={() => handleSportSpecificPoint(1, 'Block Point (+1)')}>
+                      <Text style={[styles.sportScoreBtnVal, { color: '#2563EB' }]}>BLK</Text>
+                      <Text style={[styles.sportScoreBtnLbl, { color: '#2563EB' }]}>Block (+1)</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.sportActionRow}>
+                    <TouchableOpacity style={styles.secondaryDeskBtn} onPress={() => handleSportSpecificPoint(1, 'Opponent Error (+1)')}>
+                      <Ionicons name="alert-circle-outline" size={15} color="#0F172A" />
+                      <Text style={styles.secondaryDeskBtnText}>Opp Error (+1)</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.secondaryDeskBtn} onPress={() => handleSportSpecificPoint(-1, 'Correction (-1)')}>
+                      <Ionicons name="arrow-undo-outline" size={15} color="#E11D48" />
+                      <Text style={[styles.secondaryDeskBtnText, { color: '#E11D48' }]}>-1 Correction</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : currentSportCategory === 'Badminton' || currentSportCategory === 'Shuttle' ? (
+                /* ----------------- 4. BADMINTON / SHUTTLE DESK ----------------- */
+                <View style={styles.sportDeskWrapper}>
+                  <Text style={styles.sectionHeaderInnerLabelTitle}>21-POINT RALLY BADMINTON CONSOLE</Text>
+                  <Text style={styles.strikeInstructionHelperSubtext}>
+                    Scoring For: <Text style={{ fontWeight: '900' }}>{activeBattingTeam === 'A' ? (liveTeamA || 'TEAM A') : (liveTeamB || 'TEAM B')}</Text>
+                  </Text>
+
+                  <View style={styles.sportGridRow}>
+                    <TouchableOpacity style={[styles.sportScoreBtn, { backgroundColor: '#0F172A', borderColor: '#0F172A' }]} onPress={() => handleSportSpecificPoint(1, 'Rally Point (+1)')}>
+                      <Text style={[styles.sportScoreBtnVal, { color: '#FFFFFF' }]}>+1</Text>
+                      <Text style={[styles.sportScoreBtnLbl, { color: '#FFFFFF' }]}>Rally Point</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.sportScoreBtn, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]} onPress={() => handleSportSpecificPoint(1, 'Smash / Winner (+1)')}>
+                      <Text style={[styles.sportScoreBtnVal, { color: '#059669' }]}>SMASH</Text>
+                      <Text style={[styles.sportScoreBtnLbl, { color: '#059669' }]}>Winner (+1)</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.sportScoreBtn, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]} onPress={() => handleSportSpecificPoint(1, 'Opponent Error (+1)')}>
+                      <Text style={[styles.sportScoreBtnVal, { color: '#2563EB' }]}>ERR</Text>
+                      <Text style={[styles.sportScoreBtnLbl, { color: '#2563EB' }]}>Opp Error (+1)</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.sportActionRow}>
+                    <TouchableOpacity style={styles.secondaryDeskBtn} onPress={() => {
+                      const activeTeamName = activeBattingTeam === 'A' ? (liveTeamA || 'TEAM A') : (liveTeamB || 'TEAM B');
+                      setLiveStatusText(`🏸 Game / Set Won by ${activeTeamName}!`);
                     }}>
-                      <Text style={[styles.standardIncrementBtnActionText, { color: '#000000' }]}>-1 Point Correction</Text>
+                      <Ionicons name="trophy-outline" size={15} color="#059669" />
+                      <Text style={[styles.secondaryDeskBtnText, { color: '#059669' }]}>Set / Game Won</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.secondaryDeskBtn} onPress={() => handleSportSpecificPoint(-1, 'Correction (-1)')}>
+                      <Ionicons name="arrow-undo-outline" size={15} color="#E11D48" />
+                      <Text style={[styles.secondaryDeskBtnText, { color: '#E11D48' }]}>-1 Correction</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                /* ----------------- 5. GENERAL / OTHERS DESK ----------------- */
+                <View style={styles.sportDeskWrapper}>
+                  <Text style={styles.sectionHeaderInnerLabelTitle}>STANDARD TOURNAMENT SCORE MODIFIERS</Text>
+                  <Text style={styles.strikeInstructionHelperSubtext}>
+                    Scoring For: <Text style={{ fontWeight: '900' }}>{activeBattingTeam === 'A' ? (liveTeamA || 'TEAM A') : (liveTeamB || 'TEAM B')}</Text>
+                  </Text>
+
+                  <View style={styles.sportGridRow}>
+                    <TouchableOpacity style={styles.sportScoreBtn} onPress={() => handleSportSpecificPoint(1, '+1 Point Scored')}>
+                      <Text style={styles.sportScoreBtnVal}>+1</Text>
+                      <Text style={styles.sportScoreBtnLbl}>Point</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.sportScoreBtn} onPress={() => handleSportSpecificPoint(2, '+2 Points Scored')}>
+                      <Text style={styles.sportScoreBtnVal}>+2</Text>
+                      <Text style={styles.sportScoreBtnLbl}>Points</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.sportScoreBtn, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]} onPress={() => handleSportSpecificPoint(1, 'Goal Scored (+1)')}>
+                      <Text style={[styles.sportScoreBtnVal, { color: '#059669' }]}>GOAL</Text>
+                      <Text style={[styles.sportScoreBtnLbl, { color: '#059669' }]}>Goal (+1)</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.sportActionRow}>
+                    <TouchableOpacity style={styles.secondaryDeskBtn} onPress={() => handleSportSpecificPoint(3, '+3 Points Scored')}>
+                      <Ionicons name="add-circle-outline" size={15} color="#0F172A" />
+                      <Text style={styles.secondaryDeskBtnText}>+3 Points</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.secondaryDeskBtn} onPress={() => handleSportSpecificPoint(-1, 'Correction (-1)')}>
+                      <Ionicons name="arrow-undo-outline" size={15} color="#E11D48" />
+                      <Text style={[styles.secondaryDeskBtnText, { color: '#E11D48' }]}>-1 Correction</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1244,7 +1455,8 @@ const styles = StyleSheet.create({
   slashSeparator: { fontSize: 24, fontWeight: '500', color: '#000000', marginHorizontal: 6 },
   battingDotIndicatorBadge: { backgroundColor: '#000000', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4, marginTop: 4 },
   battingDotIndicatorBadgeText: { color: '#FFFFFF', fontSize: 8, fontWeight: '800' },
-  genericPointsCardContainer: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', padding: 12, borderRadius: 12, marginBottom: 16 },
+
+  // Cricket Styles (Untouched)
   cricbuzzDashboardWrapper: { backgroundColor: '#F8FAFC', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 },
   sectionHeaderInnerLabelTitle: { fontSize: 13, fontWeight: '800', color: '#000000', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
   strikeInstructionHelperSubtext: { fontSize: 11, fontWeight: '600', color: '#000000', marginBottom: 12 },
@@ -1264,10 +1476,19 @@ const styles = StyleSheet.create({
   cricbuzzBtnLbl: { fontSize: 10, fontWeight: '800', color: '#000000', marginTop: 1 },
   cricbuzzWideActionBtn: { flex: 1, height: 44, borderWidth: 1, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   wideBtnText: { fontSize: 10, fontWeight: '800' },
-  genericPointsButtonInlineFlexRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  standardIncrementBtnAction: { flex: 1, height: 40, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#000000', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  standardIncrementBtnActionText: { color: '#000000', fontSize: 13, fontWeight: '800' },
 
+  // Dedicated Sports Desks (Kabaddi, Volleyball, Badminton, Others)
+  sportDeskWrapper: { backgroundColor: '#F8FAFC', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 },
+  deskSubCategoryLabel: { fontSize: 10, fontWeight: '800', color: '#64748B', letterSpacing: 0.5, marginTop: 6, marginBottom: 8 },
+  sportGridRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  sportScoreBtn: { flex: 1, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', elevation: 1 },
+  sportScoreBtnVal: { fontSize: 18, fontWeight: '900', color: '#0F172A' },
+  sportScoreBtnLbl: { fontSize: 10, fontWeight: '800', color: '#64748B', marginTop: 2, textAlign: 'center' },
+  sportActionRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  secondaryDeskBtn: { flex: 1, height: 42, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  secondaryDeskBtnText: { fontSize: 12, fontWeight: '800', color: '#0F172A' },
+
+  // Breakdown Scorecards
   breakdownScroll: { paddingBottom: 20 },
   modalVerdictBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', padding: 12, borderRadius: 12, marginBottom: 14 },
   modalVerdictText: { fontSize: 13, fontWeight: '800', color: '#065F46', flex: 1 },
