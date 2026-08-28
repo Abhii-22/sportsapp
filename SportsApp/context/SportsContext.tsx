@@ -35,7 +35,14 @@ export interface SportEvent {
   date: string;
   location: string;
   poster: string;
-  organizer?: string;
+  organizer?: any;
+  organizerName?: string;
+  organizerDetails?: {
+    id?: string;
+    fullName?: string;
+    email?: string;
+    phone?: string;
+  };
   isVerifiedOrganizer: boolean;
   matches: Match[];
 }
@@ -106,7 +113,6 @@ export function SportsProvider({ children }: { children: React.ReactNode }) {
             totalOvers: m.totalOvers || '20',
           }));
 
-          // Deduplicate matches per tournament by ID and Team pairing
           const seenMatchKeys = new Set<string>();
           const deduplicatedMatches: Match[] = [];
 
@@ -118,6 +124,12 @@ export function SportsProvider({ children }: { children: React.ReactNode }) {
             }
           });
 
+          const resolvedOrganizerName =
+            item.organizerName ||
+            (item.organizer && typeof item.organizer === 'object' ? item.organizer.fullName : undefined) ||
+            item.organizerDetails?.fullName ||
+            'Abhishek';
+
           return {
             id: item._id,
             name: item.name,
@@ -127,6 +139,8 @@ export function SportsProvider({ children }: { children: React.ReactNode }) {
             location: item.location,
             poster: item.poster,
             organizer: item.organizer ? (typeof item.organizer === 'object' ? item.organizer._id : item.organizer) : undefined,
+            organizerName: resolvedOrganizerName,
+            organizerDetails: item.organizerDetails || (typeof item.organizer === 'object' ? item.organizer : undefined),
             isVerifiedOrganizer: item.isVerifiedOrganizer ?? true,
             matches: deduplicatedMatches,
           };

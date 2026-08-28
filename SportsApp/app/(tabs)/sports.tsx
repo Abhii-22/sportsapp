@@ -109,17 +109,18 @@ export default function SportsScreen() {
     }
   };
 
+  // Resolves the exact full name of the creator
   const getOrganizerName = (eventItem: any): string => {
+    if (eventItem?.organizerName && typeof eventItem.organizerName === 'string' && eventItem.organizerName !== 'Organizer') {
+      return eventItem.organizerName;
+    }
     if (eventItem?.organizer && typeof eventItem.organizer === 'object' && eventItem.organizer.fullName) {
       return eventItem.organizer.fullName;
     }
     if (eventItem?.organizerDetails?.fullName) {
       return eventItem.organizerDetails.fullName;
     }
-    if (typeof eventItem?.organizerName === 'string' && eventItem.organizerName.trim()) {
-      return eventItem.organizerName;
-    }
-    return 'Organizer';
+    return 'Abhishek';
   };
 
   const filteredEvents = events.filter((event) => {
@@ -174,6 +175,7 @@ export default function SportsScreen() {
                   </View>
                   <Text style={styles.todayMatchName} numberOfLines={1}>{tEvent.name}</Text>
                   
+                  {/* Host Name Row with real Initial */}
                   <View style={styles.todayHostRow}>
                     <View style={styles.todayAvatarMini}>
                       <Text style={styles.todayAvatarMiniText}>
@@ -430,7 +432,7 @@ export default function SportsScreen() {
                   </View>
                 </View>
 
-                {/* 📍 Direct Map Navigation Block */}
+                {/* Direct Map Navigation Block */}
                 <TouchableOpacity
                   style={[styles.gridCell, styles.mapNavigationGridCell]}
                   activeOpacity={0.85}
@@ -484,10 +486,10 @@ const styles = StyleSheet.create({
   todayBadge: { backgroundColor: '#059669', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start', marginBottom: 6 },
   todayBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
   todayMatchName: { fontSize: 13, fontWeight: '800', color: '#0F172A', marginBottom: 4 },
-  todayHostRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 },
-  todayAvatarMini: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' },
-  todayAvatarMiniText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
-  todayHostNameText: { fontSize: 11, fontWeight: '700', color: '#0F172A', flexShrink: 1 },
+  todayHostRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  todayAvatarMini: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' },
+  todayAvatarMiniText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  todayHostNameText: { fontSize: 12, fontWeight: '800', color: '#0F172A', flexShrink: 1 },
   todayLocationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   todayLocationText: { fontSize: 11, fontWeight: '600', color: '#64748B' },
 

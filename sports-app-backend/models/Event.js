@@ -9,6 +9,7 @@ const eventSchema = new mongoose.Schema(
     location: { type: String, required: true },
     poster: { type: String, required: true },
     organizer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    organizerName: { type: String, default: '' }, // Stores registered full name directly
     isVerifiedOrganizer: { type: Boolean, default: true }
   },
   { timestamps: true }

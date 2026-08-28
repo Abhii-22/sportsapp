@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, TouchableOpacity, Modal, TextInput, Image, Scro
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { useSports, SportEvent, Match } from '../../context/SportsContext';
+import { useSports, SportEvent } from '../../context/SportsContext';
 import { useAuth } from '../_layout';
 
 const { width } = Dimensions.get('window');
@@ -18,15 +18,17 @@ export default function ProfileScreen() {
   const [scoreModalVisible, setScoreModalVisible] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<SportEvent | null>(null);
 
-  // Tab State for Tournaments vs Finished Matches View
   const [selectedProfileTab, setSelectedProfileTab] = useState<'tournaments' | 'finished'>('tournaments');
 
-  // Breakdown Modal for Finished Matches
   const [breakdownModalVisible, setBreakdownModalVisible] = useState(false);
   const [selectedFinishedMatch, setSelectedFinishedMatch] = useState<any | null>(null);
   const [selectedInningsTeam, setSelectedInningsTeam] = useState<'A' | 'B'>('A');
 
-  const myEvents = events.filter((e) => user?.id && e.organizer === user.id);
+  const myEvents = events.filter((e) => {
+    if (!user?.id) return false;
+    const orgId = typeof e.organizer === 'object' && e.organizer !== null ? (e.organizer as any)._id || (e.organizer as any).id : e.organizer;
+    return orgId === user.id;
+  });
   
   const [sportsName, setSportsName] = useState('Kabaddi');
   const [sportType, setSportType] = useState<'CRICKET' | 'OTHER'>('OTHER');
@@ -38,7 +40,6 @@ export default function ProfileScreen() {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Umpire Board States
   const [liveTeamA, setLiveTeamA] = useState('');
   const [liveTeamB, setLiveTeamB] = useState('');
   const [liveScoreA, setLiveScoreA] = useState('0');
@@ -108,7 +109,14 @@ export default function ProfileScreen() {
       date, 
       location, 
       poster,
-      organizer: user?.id
+      organizer: user?.id,
+      organizerName: user?.fullName || 'Abhishek',
+      organizerDetails: {
+        id: user?.id,
+        fullName: user?.fullName || 'Abhishek',
+        email: user?.email,
+        phone: user?.phone,
+      }
     });
     
     if (wasCreated) {
@@ -531,7 +539,6 @@ export default function ProfileScreen() {
     );
   };
 
-  // Compile all completed matches for the user
   const allMyFinishedMatches = myEvents.flatMap((event, eventIdx) =>
     (event.matches || [])
       .filter((m) => {
@@ -565,7 +572,6 @@ export default function ProfileScreen() {
       }))
   );
 
-  // Deduplicate finished matches list
   const uniqueFinishedMatches = Array.from(
     new Map(
       allMyFinishedMatches.map((m) => [
@@ -610,6 +616,8 @@ export default function ProfileScreen() {
     ? (selectedFinishedMatch?.inningsABalls || []) 
     : (selectedFinishedMatch?.inningsBBalls || []);
 
+  const displayName = user?.fullName || 'Abhishek';
+
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -619,12 +627,16 @@ export default function ProfileScreen() {
             <Text style={styles.logoutTopActionText}>Logout</Text>
           </TouchableOpacity>
 
-          <Image source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80' }} style={styles.avatar} />
-          <Text style={styles.userName}>{user?.fullName || 'Organizer'}</Text>
+          <View style={styles.avatarCircleFrame}>
+            <Text style={styles.avatarInitialText}>
+              {displayName.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+
+          <Text style={styles.userName}>{displayName}</Text>
           <Text style={styles.userBio}>{user?.email || 'email@domain.com'} • {user?.phone || '+91'}</Text>
         </View>
 
-        {/* Stats Row with Interactive Tab Switching */}
         <View style={styles.statsRow}>
           <TouchableOpacity 
             style={[styles.statBox, selectedProfileTab === 'tournaments' && styles.activeStatBox]} 
@@ -669,7 +681,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* TAB 1: TOURNAMENT GRID VIEW */}
         {selectedProfileTab === 'tournaments' ? (
           <View style={styles.gridContainer}>
             {myEvents.length === 0 ? (
@@ -697,7 +708,6 @@ export default function ProfileScreen() {
             )}
           </View>
         ) : (
-          /* TAB 2: COMPLETED MATCHES VIEW (Exact Home Card Look) */
           <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
             {uniqueFinishedMatches.length === 0 ? (
               <View style={styles.emptyContainer}>
@@ -1047,7 +1057,6 @@ export default function ProfileScreen() {
                     </View>
                   )}
                   
-                  {/* Runs Row 1 */}
                   <View style={styles.cricbuzzButtonMatrixRowGrid}>
                     <TouchableOpacity style={styles.cricbuzzBtn} onPress={() => handleBallDeliveryAction('SINGLE')}>
                       <Text style={styles.cricbuzzBtnVal}>+1</Text>
@@ -1075,7 +1084,6 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                   </View>
 
-                  {/* Extras Row */}
                   <View style={styles.cricbuzzButtonMatrixRowGrid}>
                     <TouchableOpacity style={[styles.cricbuzzWideActionBtn, { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' }]} onPress={() => handleBallDeliveryAction('WIDE')}>
                       <Ionicons name="swap-horizontal" size={15} color="#15803D" />
@@ -1088,7 +1096,6 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                   </View>
 
-                  {/* Actions Row */}
                   <View style={styles.cricbuzzButtonMatrixRowGrid}>
                     <TouchableOpacity style={[styles.cricbuzzWideActionBtn, { backgroundColor: '#FFFFFF', borderColor: '#000000' }]} onPress={() => handleBallDeliveryAction('INNING_BREAK')}>
                       <Ionicons name="cafe-outline" size={15} color="#000000" />
@@ -1146,7 +1153,10 @@ const styles = StyleSheet.create({
   profileHeader: { alignItems: 'center', paddingVertical: 20, backgroundColor: '#FFFFFF', position: 'relative', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
   logoutTopActionButton: { position: 'absolute', top: 12, right: 16, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F8FAFC', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' },
   logoutTopActionText: { fontSize: 12, fontWeight: '700', color: '#000000' },
-  avatar: { width: 90, height: 90, borderRadius: 45, marginBottom: 12, borderWidth: 2, borderColor: '#000000' },
+  
+  avatarCircleFrame: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center', marginBottom: 12, borderWidth: 2, borderColor: '#0F172A' },
+  avatarInitialText: { color: '#FFFFFF', fontSize: 34, fontWeight: '900' },
+
   userName: { fontSize: 20, fontWeight: '800', color: '#000000' },
   userBio: { fontSize: 13, color: '#000000', marginTop: 4, marginBottom: 16, fontWeight: '500' },
   statsRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: '#FFFFFF', paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#E2E8F0' },
@@ -1175,7 +1185,6 @@ const styles = StyleSheet.create({
   emptyGridText: { fontSize: 16, fontWeight: '800', color: '#000000' },
   emptyGridSubtext: { fontSize: 12, fontWeight: '500', color: '#64748B', textAlign: 'center' },
   
-  // Finished Card Styles
   matchCardVertical: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E2E8F0', borderLeftWidth: 5, borderLeftColor: '#CBD5E1' },
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   titleWithBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -1198,7 +1207,6 @@ const styles = StyleSheet.create({
   emptyIconFrame: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
   emptyText: { color: '#0F172A', fontSize: 13, fontWeight: '700', textAlign: 'center', paddingHorizontal: 30, lineHeight: 18 },
 
-  // Modals & Over Scorecards
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingBottom: 24, maxHeight: '92%', width: '100%' },
   dragIndicator: { width: 40, height: 5, backgroundColor: '#E2E8F0', borderRadius: 3, alignSelf: 'center', marginTop: 12, marginBottom: 16 },
@@ -1260,7 +1268,6 @@ const styles = StyleSheet.create({
   standardIncrementBtnAction: { flex: 1, height: 40, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#000000', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   standardIncrementBtnActionText: { color: '#000000', fontSize: 13, fontWeight: '800' },
 
-  // Breakdown Scorecard Modal
   breakdownScroll: { paddingBottom: 20 },
   modalVerdictBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', padding: 12, borderRadius: 12, marginBottom: 14 },
   modalVerdictText: { fontSize: 13, fontWeight: '800', color: '#065F46', flex: 1 },

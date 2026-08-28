@@ -1,7 +1,8 @@
 const Event = require('../models/Event');
 const Match = require('../models/Match');
+const User = require('../models/User');
 
-// Fetch Public Tournaments with Populated Organizer Details
+// Fetch Public Tournaments with Organizer Info
 const getEvents = async (req, res) => {
   try {
     const { category } = req.query;
@@ -19,7 +20,10 @@ const getEvents = async (req, res) => {
     const eventsWithMatches = await Promise.all(
       events.map(async (event) => {
         const matches = await Match.find({ eventId: event._id }).sort({ createdAt: -1 });
-        return { ...event, matches };
+        
+        // If organizer was populated, ensure organizerName is filled
+        const hostName = event.organizerName || (event.organizer && event.organizer.fullName) || 'Abhishek';
+        return { ...event, organizerName: hostName, matches };
       })
     );
 
@@ -40,7 +44,8 @@ const getMyEvents = async (req, res) => {
     const eventsWithMatches = await Promise.all(
       events.map(async (event) => {
         const matches = await Match.find({ eventId: event._id }).sort({ createdAt: -1 });
-        return { ...event, matches };
+        const hostName = event.organizerName || (event.organizer && event.organizer.fullName) || 'Abhishek';
+        return { ...event, organizerName: hostName, matches };
       })
     );
 
@@ -50,13 +55,20 @@ const getMyEvents = async (req, res) => {
   }
 };
 
-// Create Event with populated organizer details
+// Create Event
 const createEvent = async (req, res) => {
   try {
-    const { name, sportCategory, sportType, date, location, poster } = req.body;
+    const { name, sportCategory, sportType, date, location, poster, organizerName } = req.body;
 
     if (!name || !date || !location || !poster) {
       return res.status(400).json({ success: false, message: 'Please fill in all tournament details' });
+    }
+
+    // Lookup user to guarantee the full name from database
+    let realFullName = organizerName;
+    if (!realFullName) {
+      const dbUser = await User.findById(req.user.id).select('fullName');
+      realFullName = dbUser ? dbUser.fullName : 'Abhishek';
     }
 
     let event = await Event.create({
@@ -67,6 +79,7 @@ const createEvent = async (req, res) => {
       location,
       poster,
       organizer: req.user.id,
+      organizerName: realFullName,
       isVerifiedOrganizer: true,
     });
 
@@ -74,7 +87,10 @@ const createEvent = async (req, res) => {
       .populate('organizer', 'fullName email phone')
       .lean();
 
-    res.status(201).json({ success: true, data: { ...populatedEvent, matches: [] } });
+    res.status(201).json({ 
+      success: true, 
+      data: { ...populatedEvent, organizerName: realFullName, matches: [] } 
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
