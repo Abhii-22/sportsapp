@@ -4,13 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSports } from '../../context/SportsContext'; 
 
 export default function HomeScreen() {
-  const { events } = useSports(); 
+  const { events } = useSports();
   const [activeTab, setActiveTab] = useState<'live' | 'completed'>('live');
   const [selectedFinishedMatch, setSelectedFinishedMatch] = useState<any | null>(null);
   const [breakdownModalVisible, setBreakdownModalVisible] = useState(false);
   const [selectedInningsTeam, setSelectedInningsTeam] = useState<'A' | 'B'>('A');
 
-  const allMatches = events.flatMap((event, eventIdx) => 
+  const allMatchesRaw = events.flatMap((event, eventIdx) => 
     (event.matches || []).map((match: any, matchIdx: number) => {
       const isFinishedStatus = 
         match.isLive === false || 
@@ -25,8 +25,9 @@ export default function HomeScreen() {
 
       return {
         id: match._id || match.id || `event-${event.id || eventIdx}-match-${matchIdx}`,
+        eventId: event.id,
         sport: event.sportCategory ? event.sportCategory.toUpperCase() : event.name.toUpperCase(),
-        sportType: event.sportType, 
+        sportType: event.sportType,
         teamA: match.teamAName || 'TEAM A',
         teamB: match.teamBName || 'TEAM B',
         scoreA: match.scoreA || '0',
@@ -38,7 +39,7 @@ export default function HomeScreen() {
         status: match.status || 'Match Scheduled',
         isLive: isLiveNow,
         isFinished: isFinishedStatus,
-        isVerified: event.isVerifiedOrganizer, 
+        isVerified: event.isVerifiedOrganizer,
         recentBalls: match.recentBalls || match.ballHistory || [],
         ballHistory: match.ballHistory || match.recentBalls || [],
         inningsABalls: match.inningsABalls || match.ballHistory || [],
@@ -46,6 +47,19 @@ export default function HomeScreen() {
       };
     })
   );
+
+  // Global Deduplication: prevents duplicated match cards across live updates and finished saves
+  const uniqueMatchesMap = new Map<string, any>();
+  allMatchesRaw.forEach((m) => {
+    const key = m.id && !m.id.startsWith('event-') 
+      ? m.id 
+      : `${m.eventId}-${m.teamA.toLowerCase()}-${m.teamB.toLowerCase()}`;
+    if (!uniqueMatchesMap.has(key)) {
+      uniqueMatchesMap.set(key, m);
+    }
+  });
+
+  const allMatches = Array.from(uniqueMatchesMap.values());
 
   const filteredMatches = allMatches.filter((match) => {
     if (activeTab === 'live') {
@@ -74,6 +88,7 @@ export default function HomeScreen() {
 
       deliveries.forEach((b) => {
         if (b === 'W') wickets += 1;
+        else if (b === 'WD' || b === 'NB') runs += 1;
         else runs += parseInt(b, 10) || 0;
       });
 
@@ -214,10 +229,10 @@ export default function HomeScreen() {
                           key={ballIdx} 
                           style={[
                             styles.cardBallDot, 
-                            ball === '4' ? styles.ballFour : ball === '6' ? styles.ballSix : ball === 'W' ? styles.ballWicket : styles.ballNormal
+                            ball === '4' ? styles.ballFour : ball === '6' ? styles.ballSix : ball === 'W' ? styles.ballWicket : (ball === 'WD' || ball === 'NB') ? styles.ballExtra : styles.ballNormal
                           ]}
                         >
-                          <Text style={[styles.cardBallText, (ball === '4' || ball === '6' || ball === 'W') && styles.cardBallTextWhite]}>
+                          <Text style={[styles.cardBallText, (ball === '4' || ball === '6' || ball === 'W' || ball === 'WD' || ball === 'NB') && styles.cardBallTextWhite]}>
                             {ball}
                           </Text>
                         </View>
@@ -323,10 +338,10 @@ export default function HomeScreen() {
                           key={`ball-${bIdx}`} 
                           style={[
                             styles.breakdownBallCircle,
-                            b === '4' ? styles.ballFour : b === '6' ? styles.ballSix : b === 'W' ? styles.ballWicket : styles.ballNormal
+                            b === '4' ? styles.ballFour : b === '6' ? styles.ballSix : b === 'W' ? styles.ballWicket : (b === 'WD' || b === 'NB') ? styles.ballExtra : styles.ballNormal
                           ]}
                         >
-                          <Text style={[styles.breakdownBallText, (b === '4' || b === '6' || b === 'W') && styles.cardBallTextWhite]}>
+                          <Text style={[styles.breakdownBallText, (b === '4' || b === '6' || b === 'W' || b === 'WD' || b === 'NB') && styles.cardBallTextWhite]}>
                             {b}
                           </Text>
                         </View>
@@ -404,6 +419,7 @@ const styles = StyleSheet.create({
   ballFour: { backgroundColor: '#059669', borderColor: '#047857' },
   ballSix: { backgroundColor: '#0F172A', borderColor: '#020617' },
   ballWicket: { backgroundColor: '#E11D48', borderColor: '#BE123C' },
+  ballExtra: { backgroundColor: '#D97706', borderColor: '#B45309' },
   cardBallText: { fontSize: 10, fontWeight: '800', color: '#0F172A' },
   cardBallTextWhite: { color: '#FFFFFF' },
   

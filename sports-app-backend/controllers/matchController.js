@@ -55,7 +55,6 @@ const updateMatchScore = async (req, res) => {
     if (inningsABalls !== undefined) match.inningsABalls = inningsABalls;
     if (inningsBBalls !== undefined) match.inningsBBalls = inningsBBalls;
 
-    // ⚡ Automatic deactivation when finished
     if (
       isLive === false ||
       status === 'Match Completed' ||
@@ -80,7 +79,7 @@ const updateMatchScore = async (req, res) => {
   }
 };
 
-// 3. PERMANENT SAVE: Creates finished match AND turns off active live status for previous matches in the same event
+// 3. Finalize & Save Completed Match (Updates in-place to prevent duplication)
 const createCompletedMatch = async (req, res) => {
   try {
     const { 
@@ -99,34 +98,47 @@ const createCompletedMatch = async (req, res) => {
       inningsBBalls 
     } = req.body;
 
-    // ⚡ Step 1: Ensure all existing live match rows for this event are marked as finished
-    await Match.updateMany({ eventId, isLive: true }, { isLive: false });
-
-    // ⚡ Step 2: Save the final finished match
-    const newMatch = new Match({
+    let match = await Match.findOne({
       eventId,
-      teamAName,
-      teamBName,
-      scoreA,
-      scoreB,
-      wicketsA,
-      wicketsB,
-      overs,
-      totalOvers,
-      status,
-      isLive: false, // ⚡ Strictly false
-      ballHistory: ballHistory || [],
-      inningsABalls: inningsABalls || [],
-      inningsBBalls: inningsBBalls || [],
-    });
+      $or: [
+        { isLive: true },
+        { teamAName, teamBName },
+        { teamAName: teamBName, teamBName: teamAName }
+      ]
+    }).sort({ createdAt: -1 });
 
-    await newMatch.save();
-
-    if (req.io) {
-      req.io.emit('score_updated', newMatch);
+    if (!match) {
+      match = new Match({ eventId });
     }
 
-    res.json({ success: true, data: newMatch });
+    match.teamAName = teamAName;
+    match.teamBName = teamBName;
+    match.scoreA = scoreA;
+    match.scoreB = scoreB;
+    match.wicketsA = wicketsA || '0';
+    match.wicketsB = wicketsB || '0';
+    match.overs = overs || '0.0';
+    match.totalOvers = totalOvers || '20';
+    match.status = status || 'Match Completed';
+    match.isLive = false;
+    match.ballHistory = ballHistory || [];
+    match.inningsABalls = inningsABalls || [];
+    match.inningsBBalls = inningsBBalls || [];
+
+    await match.save();
+
+    await Match.deleteMany({
+      eventId,
+      _id: { $ne: match._id },
+      teamAName: match.teamAName,
+      teamBName: match.teamBName
+    });
+
+    if (req.io) {
+      req.io.emit('score_updated', match);
+    }
+
+    res.json({ success: true, data: match });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

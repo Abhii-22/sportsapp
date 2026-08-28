@@ -85,39 +85,17 @@ export function SportsProvider({ children }: { children: React.ReactNode }) {
   const fetchEvents = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/events`, {
-        headers: {
-          Accept: 'application/json',
-        },
+        headers: { Accept: 'application/json' },
       });
 
       const rawText = await response.text();
+      if (!rawText || rawText.trim().startsWith('<')) return;
 
-      // Guard against empty responses or HTML error pages (e.g., Render 502/504)
-      if (!rawText || rawText.trim() === '' || rawText.trim().startsWith('<')) {
-        console.warn('Backend returned non-JSON / server warming up on Render.');
-        return;
-      }
-
-      let result;
-      try {
-        result = JSON.parse(rawText);
-      } catch {
-        console.warn('Unable to parse server output as JSON:', rawText);
-        return;
-      }
+      const result = JSON.parse(rawText);
 
       if (result.success && Array.isArray(result.data)) {
-        const mappedData: SportEvent[] = result.data.map((item: any) => ({
-          id: item._id,
-          name: item.name,
-          sportCategory: item.sportCategory,
-          sportType: item.sportType || 'OTHER',
-          date: item.date,
-          location: item.location,
-          poster: item.poster,
-          organizer: item.organizer ? (typeof item.organizer === 'object' ? item.organizer._id : item.organizer) : undefined,
-          isVerifiedOrganizer: item.isVerifiedOrganizer ?? true,
-          matches: (item.matches || []).map((m: any) => ({
+        const mappedData: SportEvent[] = result.data.map((item: any) => {
+          const rawMatches = (item.matches || []).map((m: any) => ({
             ...m,
             id: m._id || m.id,
             isLive: m.isLive,
@@ -126,8 +104,33 @@ export function SportsProvider({ children }: { children: React.ReactNode }) {
             inningsABalls: m.inningsABalls || m.ballHistory || [],
             inningsBBalls: m.inningsBBalls || [],
             totalOvers: m.totalOvers || '20',
-          })),
-        }));
+          }));
+
+          // Deduplicate matches per tournament by ID and Team pairing
+          const seenMatchKeys = new Set<string>();
+          const deduplicatedMatches: Match[] = [];
+
+          rawMatches.forEach((m: Match) => {
+            const pairKey = `${m.teamAName?.trim().toLowerCase()}_vs_${m.teamBName?.trim().toLowerCase()}`;
+            if (!seenMatchKeys.has(pairKey)) {
+              seenMatchKeys.add(pairKey);
+              deduplicatedMatches.push(m);
+            }
+          });
+
+          return {
+            id: item._id,
+            name: item.name,
+            sportCategory: item.sportCategory,
+            sportType: item.sportType || 'OTHER',
+            date: item.date,
+            location: item.location,
+            poster: item.poster,
+            organizer: item.organizer ? (typeof item.organizer === 'object' ? item.organizer._id : item.organizer) : undefined,
+            isVerifiedOrganizer: item.isVerifiedOrganizer ?? true,
+            matches: deduplicatedMatches,
+          };
+        });
         setEvents(mappedData);
       }
     } catch (error) {

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "SportsApp",
+    "name": "AK SPORTS",
     "slug": "SportsApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,12 +12,20 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.aksports.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECORD_AUDIO"
+      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
@@ -39,6 +47,12 @@
           }
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow AK SPORTS to access your photos to upload tournament banners."
+        }
+      ],
       "expo-video",
       "expo-web-browser",
       "@react-native-community/datetimepicker"
@@ -46,6 +60,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "aa466d0c-53ac-484e-8a2e-b18308c85a63"
+      }
     }
   }
 }
