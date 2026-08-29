@@ -2,7 +2,8 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import io from 'socket.io-client';
 import { useAuth } from '../app/_layout';
 
-const API_BASE_URL = 'https://sportsapp-2c1m.onrender.com';
+// const API_BASE_URL = 'https://sportsapp-2c1m.onrender.com';
+const API_BASE_URL = 'http://192.168.1.4:5000';
 const socket = io(API_BASE_URL, {
   transports: ['websocket', 'polling'],
   autoConnect: true,
