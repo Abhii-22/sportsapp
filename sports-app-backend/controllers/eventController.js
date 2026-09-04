@@ -2,7 +2,7 @@ const Event = require('../models/Event');
 const Match = require('../models/Match');
 const User = require('../models/User');
 
-// Fetch Public Tournaments with Organizer Info
+// Fetch Public Tournaments with Organizer Info & Matches in a single optimized pass
 const getEvents = async (req, res) => {
   try {
     const { category } = req.query;
@@ -12,20 +12,29 @@ const getEvents = async (req, res) => {
       filter.sportCategory = category;
     }
 
+    // 1. Fetch events and populate organizer efficiently
     const events = await Event.find(filter)
       .populate('organizer', 'fullName email phone')
       .sort({ createdAt: -1 })
       .lean();
 
-    const eventsWithMatches = await Promise.all(
-      events.map(async (event) => {
-        const matches = await Match.find({ eventId: event._id }).sort({ createdAt: -1 });
-        
-        // If organizer was populated, ensure organizerName is filled
-        const hostName = event.organizerName || (event.organizer && event.organizer.fullName) || 'Abhishek';
-        return { ...event, organizerName: hostName, matches };
-      })
-    );
+    // 2. Fetch all related matches for these events in ONE single query instead of N individual queries
+    const eventIds = events.map(e => e._id);
+    const allMatches = await Match.find({ eventId: { $in: eventIds } }).sort({ createdAt: -1 }).lean();
+
+    // 3. Group matches by eventId in-memory for instant mapping
+    const matchMap = {};
+    allMatches.forEach(match => {
+      const eIdStr = match.eventId.toString();
+      if (!matchMap[eIdStr]) matchMap[eIdStr] = [];
+      matchMap[eIdStr].push(match);
+    });
+
+    const eventsWithMatches = events.map((event) => {
+      const matches = matchMap[event._id.toString()] || [];
+      const hostName = event.organizerName || (event.organizer && event.organizer.fullName) || 'Abhishek';
+      return { ...event, organizerName: hostName, matches };
+    });
 
     res.json({ success: true, count: eventsWithMatches.length, data: eventsWithMatches });
   } catch (error) {
@@ -33,21 +42,29 @@ const getEvents = async (req, res) => {
   }
 };
 
-// Fetch Tournaments for Current User
+// Fetch Tournaments for Current User (Optimized similarly)
 const getMyEvents = async (req, res) => {
   try {
-    const events = await Event.find({ organizer: req.user.id })
+    const events = await Event.mainFind ? await Event.find({ organizer: req.user.id }) : await Event.find({ organizer: req.user.id })
       .populate('organizer', 'fullName email phone')
       .sort({ createdAt: -1 })
       .lean();
 
-    const eventsWithMatches = await Promise.all(
-      events.map(async (event) => {
-        const matches = await Match.find({ eventId: event._id }).sort({ createdAt: -1 });
-        const hostName = event.organizerName || (event.organizer && event.organizer.fullName) || 'Abhishek';
-        return { ...event, organizerName: hostName, matches };
-      })
-    );
+    const eventIds = events.map(e => e._id);
+    const allMatches = await Match.find({ eventId: { $in: eventIds } }).sort({ createdAt: -1 }).lean();
+
+    const matchMap = {};
+    allMatches.forEach(match => {
+      const eIdStr = match.eventId.toString();
+      if (!matchMap[eIdStr]) matchMap[eIdStr] = [];
+      matchMap[eIdStr].push(match);
+    });
+
+    const eventsWithMatches = events.map((event) => {
+      const matches = matchMap[event._id.toString()] || [];
+      const hostName = event.organizerName || (event.organizer && event.organizer.fullName) || 'Abhishek';
+      return { ...event, organizerName: hostName, matches };
+    });
 
     res.json({ success: true, count: eventsWithMatches.length, data: eventsWithMatches });
   } catch (error) {
@@ -64,7 +81,6 @@ const createEvent = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please fill in all tournament details' });
     }
 
-    // Lookup user to guarantee the full name from database
     let realFullName = organizerName;
     if (!realFullName) {
       const dbUser = await User.findById(req.user.id).select('fullName');
@@ -81,6 +97,8 @@ const createEvent = async (req, res) => {
       organizer: req.user.id,
       organizerName: realFullName,
       isVerifiedOrganizer: true,
+      isLive: false,
+      isCompleted: false,
     });
 
     const populatedEvent = await Event.findById(event._id)
@@ -96,4 +114,37 @@ const createEvent = async (req, res) => {
   }
 };
 
-module.exports = { getEvents, getMyEvents, createEvent };
+// Toggle Tournament Status (Live / Completed)
+const updateTournamentStatus = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { isLive, isCompleted } = req.body;
+
+    if (!eventId || eventId === 'undefined') {
+      return res.status(400).json({ success: false, message: 'Invalid tournament ID provided.' });
+    }
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, message: 'Tournament not found' });
+    }
+
+    if (isLive !== undefined) event.isLive = isLive;
+    if (isCompleted !== undefined) {
+      event.isCompleted = isCompleted;
+      if (isCompleted) event.isLive = false;
+    }
+
+    await event.save();
+
+    if (req.io) {
+      req.io.emit('score_updated', event);
+    }
+
+    return res.status(200).json({ success: true, data: event });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { getEvents, getMyEvents, createEvent, updateTournamentStatus };

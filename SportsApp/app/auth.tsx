@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from './_layout';
 
-// const API_BASE_URL = 'https://sportsapp-2c1m.onrender.com';
-const API_BASE_URL = 'http://192.168.1.4:5000';
+const API_BASE_URL = 'https://sportsapp-2c1m.onrender.com';
+// const API_BASE_URL = 'http://192.168.1.13:5000';
 
 export default function AuthScreen() {
   const { loginUserSession } = useAuth();
@@ -19,6 +19,11 @@ export default function AuthScreen() {
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [securePasswordText, setSecurePasswordText] = useState(true);
+
+  // Wake up backend server immediately when login screen loads to prevent cold-start delays
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/`, { method: 'GET' }).catch(() => {});
+  }, []);
 
   // Request OTP from Backend
   const handleSendOtp = async () => {

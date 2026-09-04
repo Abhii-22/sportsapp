@@ -9,11 +9,12 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const matchRoutes = require('./routes/matchRoutes');
+const teamRoutes = require('./routes/teamRoutes'); // 👈 Imported Team Routes
 
 const app = express();
 const server = http.createServer(app);
 
-// Initialize Socket.io with open CORS for React Native mobile clients
+// Initialize Socket.io with open CORS
 const io = new Server(server, {
   cors: {
     origin: '*',
@@ -24,23 +25,25 @@ const io = new Server(server, {
 // Connect to MongoDB Atlas Cloud Database
 connectDB();
 
-// Standard Middlewares
+// Global CORS Middleware
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
 }));
+app.options('*', cors());
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
-// Inject Socket.io into HTTP requests so controllers can emit live events
+// Live Terminal Request Logger
 app.use((req, res, next) => {
+  console.log(`📡 [${req.method}] ${req.url}`);
   req.io = io;
   next();
 });
 
-// Health Check Endpoint (Render Health Check)
+// Health Check Endpoint
 app.get('/', (req, res) => {
   res.status(200).json({
     success: true,
@@ -53,8 +56,9 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/matches', matchRoutes);
+app.use('/api/teams', teamRoutes); // 👈 Mounted Team Routes
 
-// Global 404 Handler (Always returns JSON instead of default HTML)
+// Global 404 Handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -85,7 +89,7 @@ process.on('unhandledRejection', (err) => {
   console.error('Unhandled Rejection Error:', err);
 });
 
-// Start Express Server - Binding explicitly to 0.0.0.0 for Render
+// Start Express Server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 AK Sports Server running on port ${PORT}`);

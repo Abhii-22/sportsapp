@@ -10,13 +10,47 @@ const getMatches = async (req, res) => {
   }
 };
 
-// 2. Live Update (Ball-by-ball scoring)
+// 2. Schedule a Tournament Match (League 1, League 2, Finals)
+const scheduleMatch = async (req, res) => {
+  try {
+    const { eventId, teamAName, teamBName, stage, matchDate, matchTime, totalOvers } = req.body;
+
+    if (!eventId || !teamAName || !teamBName) {
+      return res.status(400).json({ success: false, message: 'Please provide event ID and both team names.' });
+    }
+
+    const stageLabel = stage ? stage.replace('_', ' ') : 'League Match';
+
+    const match = await Match.create({
+      eventId,
+      teamAName: teamAName.trim(),
+      teamBName: teamBName.trim(),
+      stage: stage || 'LEAGUE_1',
+      matchDate: matchDate || '',
+      matchTime: matchTime || '',
+      totalOvers: totalOvers || '20',
+      status: `Scheduled • ${stageLabel}`,
+      isLive: false,
+    });
+
+    if (req.io) {
+      req.io.emit('score_updated', match);
+    }
+
+    res.status(201).json({ success: true, data: match });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 3. Live Update (Ball-by-ball scoring)
 const updateMatchScore = async (req, res) => {
   try {
     const { matchId } = req.params;
     const { 
       teamAName, 
       teamBName, 
+      stage,
       scoreA, 
       scoreB, 
       wicketsA, 
@@ -42,6 +76,7 @@ const updateMatchScore = async (req, res) => {
 
     match.teamAName = teamAName !== undefined ? teamAName : match.teamAName;
     match.teamBName = teamBName !== undefined ? teamBName : match.teamBName;
+    if (stage !== undefined) match.stage = stage;
     match.scoreA = scoreA !== undefined ? scoreA : match.scoreA;
     match.scoreB = scoreB !== undefined ? scoreB : match.scoreB;
     match.wicketsA = wicketsA !== undefined ? wicketsA : match.wicketsA;
@@ -70,6 +105,7 @@ const updateMatchScore = async (req, res) => {
     await match.save();
 
     if (req.io) {
+      // 👈 Emits the match payload directly for instant client-side patching
       req.io.emit('score_updated', match);
     }
 
@@ -79,13 +115,14 @@ const updateMatchScore = async (req, res) => {
   }
 };
 
-// 3. Finalize & Save Completed Match (Updates in-place to prevent duplication)
+// 4. Finalize & Save Completed Match (Preserves the Stage)
 const createCompletedMatch = async (req, res) => {
   try {
     const { 
       eventId, 
       teamAName, 
       teamBName, 
+      stage,
       scoreA, 
       scoreB, 
       wicketsA, 
@@ -113,6 +150,7 @@ const createCompletedMatch = async (req, res) => {
 
     match.teamAName = teamAName;
     match.teamBName = teamBName;
+    if (stage) match.stage = stage;
     match.scoreA = scoreA;
     match.scoreB = scoreB;
     match.wicketsA = wicketsA || '0';
@@ -146,6 +184,7 @@ const createCompletedMatch = async (req, res) => {
 
 module.exports = {
   getMatches,
+  scheduleMatch,
   updateMatchScore,
   createCompletedMatch,
 };
